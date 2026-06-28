@@ -40,6 +40,21 @@ First run fetches `facebook/opt-125m`'s tiny `config.json` from HuggingFace
 
 ## Usage
 
+Simplest path — `./simulate.sh` sets up the venv on first run, then forwards
+args to the CLI (run it from anywhere):
+
+```bash
+./simulate.sh demo       # synthetic demo: batch composition evolving over time
+./simulate.sh preempt    # tight block budget -> forces a preemption
+./simulate.sh --help     # full flag list
+# any flags after a shortcut override its defaults, e.g.:
+./simulate.sh preempt --latency 0.5 --jsonl preempt.jsonl
+# or drive it directly:
+./simulate.sh --workload trace --trace mytrace.csv --num-blocks 500
+```
+
+Or invoke the CLI yourself once the venv is set up:
+
 ```bash
 # Synthetic workload (Poisson arrivals), dump per-step JSONL + summary:
 .venv/bin/python -m vllm_sim --workload synthetic \
