@@ -1,7 +1,11 @@
 # Metrics Visualization — Design
 
 **Date:** 2026-07-02
-**Status:** validated (brainstorm); Track 1 building, Track 2 blocked on schema spike.
+**Status:** both tracks implemented. Track 1 (`--viz`) and Track 2 (Rezolus
+Parquet export) shipped; the schema spike below resolved to
+`grouping_power=3`/`max_value_power=64` → 496 buckets, cumulative, `List<UInt64>`
+`<metric>:buckets` columns with mandatory grouping metadata (see
+`vllm_sim/export/`).
 
 ## Goal
 

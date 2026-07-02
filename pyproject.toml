@@ -13,6 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+rezolus = ["pyarrow>=14"]
 
 [project.scripts]
 vllm-sim = "vllm_sim.cli:main"

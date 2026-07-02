@@ -79,8 +79,27 @@ python -m vllm_sim.viz steps.jsonl
 
 KPIs are scheduler-dynamics only (batch composition, queue occupancy, KV-block
 pressure, progress) — faithful under any cost model. Latency/throughput are
-intentionally omitted (degenerate under the constant cost model). Rich offline
-visualization via Rezolus is planned as an opt-in post-processing export; see
+intentionally omitted (degenerate under the constant cost model).
+
+### Rezolus export (optional, offline heatmaps)
+
+For rich distribution-over-time views, a post-processing step converts a run's
+JSONL into a [Rezolus](https://github.com/iopsystems/rezolus)-compatible Parquet
+(log-linear histograms, `grouping_power=3`/`max_value_power=64` → 496 buckets,
+cumulative per virtual-time interval; `vclock` maps to the timestamp axis). All
+heavy deps are confined to this opt-in extra — the sim core and `--viz` never
+import them.
+
+```bash
+pip install -e ".[rezolus]"                       # pulls pyarrow
+python -m vllm_sim --workload synthetic ... --jsonl steps.jsonl
+python -m vllm_sim.export.rezolus steps.jsonl -o run.parquet --target-rows 120
+# then open run.parquet in the Rezolus viewer (quantile / heatmap over time)
+```
+
+Metrics histogrammed by default: `tokens_scheduled`, `num_running`,
+`blocks_used`, `num_waiting` (override with `--metrics`). Design +
+schema-compatibility notes:
 `docs/plans/2026-07-02-metrics-visualization-design.md`.
 
 Or invoke the CLI yourself once the venv is set up:
