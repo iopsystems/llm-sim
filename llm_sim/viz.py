@@ -110,7 +110,7 @@ def _load_jsonl(path: str) -> list:
 def main(argv: Optional[List[str]] = None) -> str:
     """Standalone: render a saved run's per-step JSONL to stdout."""
     p = argparse.ArgumentParser(
-        prog="vllm_sim.viz",
+        prog="llm_sim.viz",
         description="Render a saved run's per-step JSONL as a terminal dashboard.",
     )
     p.add_argument("jsonl", help="path to per-step JSONL produced by a sim run")

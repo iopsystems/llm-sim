@@ -1,4 +1,4 @@
-# vllm-sim — vLLM V1 scheduler-in-isolation simulator
+# llm-sim — vLLM V1 scheduler-in-isolation simulator
 
 Run vLLM's **real** V1 `Scheduler` / `KVCacheManager` / `BlockPool` without a
 GPU, over a **virtual clock**, to reproduce its control-plane decisions —
@@ -74,7 +74,7 @@ preemptions   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
 Re-render any saved run's JSONL later (no re-run needed):
 
 ```bash
-python -m vllm_sim.viz steps.jsonl
+python -m llm_sim.viz steps.jsonl
 ```
 
 KPIs are scheduler-dynamics only (batch composition, queue occupancy, KV-block
@@ -92,8 +92,8 @@ import them.
 
 ```bash
 pip install -e ".[rezolus]"                       # pulls pyarrow
-python -m vllm_sim --workload synthetic ... --jsonl steps.jsonl
-python -m vllm_sim.export.rezolus steps.jsonl -o run.parquet --target-rows 120
+python -m llm_sim --workload synthetic ... --jsonl steps.jsonl
+python -m llm_sim.export.rezolus steps.jsonl -o run.parquet --target-rows 120
 # then open run.parquet in the Rezolus viewer (quantile / heatmap over time)
 ```
 
@@ -106,21 +106,21 @@ Or invoke the CLI yourself once the venv is set up:
 
 ```bash
 # Synthetic workload (Poisson arrivals), dump per-step JSONL + summary:
-.venv/bin/python -m vllm_sim --workload synthetic \
+.venv/bin/python -m llm_sim --workload synthetic \
     --num-requests 30 --arrival-rate 50 \
     --prompt-len 32 128 --output-len 8 32 --seed 7 \
     --num-blocks 500 --latency 0.01 \
     --jsonl steps.jsonl --summary summary.json
 
 # Tight block budget -> preemptions:
-.venv/bin/python -m vllm_sim --workload synthetic \
+.venv/bin/python -m llm_sim --workload synthetic \
     --num-requests 4 --interval 0.0 \
     --prompt-len 16 16 --output-len 16 16 \
     --num-blocks 8 --max-num-seqs 64 --max-model-len 4096 \
     --jsonl preempt.jsonl
 
 # Replay a trace (CSV or JSONL with request_id,arrival_time,prompt_len,output_len):
-.venv/bin/python -m vllm_sim --workload trace --trace mytrace.csv --num-blocks 500
+.venv/bin/python -m llm_sim --workload trace --trace mytrace.csv --num-blocks 500
 ```
 
 Each step is recorded as JSONL (`vclock`, `num_running`, `num_waiting`,
@@ -141,7 +141,7 @@ cost/      CostModel.step_latency(...)  -> ConstantCostModel (MVP)
 clock      VirtualClock: now / advance / fast_forward_to  (sim-loop-owned)
 metrics    per-step records -> JSONL + summary
 engine     SimLoop: admit -> schedule -> sample -> update -> advance -> record
-cli        argparse entry point (python -m vllm_sim)
+cli        argparse entry point (python -m llm_sim)
 ```
 
 ### The simulation loop

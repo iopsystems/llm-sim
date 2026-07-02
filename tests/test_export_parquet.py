@@ -6,7 +6,7 @@ import pytest
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
 
-from vllm_sim.export.rezolus import write_parquet
+from llm_sim.export.rezolus import write_parquet
 
 
 def _records(n=40):

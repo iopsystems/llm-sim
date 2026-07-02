@@ -1,6 +1,6 @@
 import json
 
-from vllm_sim.cli import main
+from llm_sim.cli import main
 
 
 def test_synthetic_run_writes_jsonl_and_summary(tmp_path):

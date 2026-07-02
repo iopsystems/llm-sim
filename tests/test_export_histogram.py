@@ -1,4 +1,4 @@
-from vllm_sim.export.histogram import LogLinearHistogram
+from llm_sim.export.histogram import LogLinearHistogram
 
 
 def test_default_config_has_496_buckets():

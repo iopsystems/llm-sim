@@ -3,7 +3,7 @@
 # simulate.sh — convenience wrapper for the vLLM scheduler-in-isolation simulator.
 #
 # Ensures the project virtualenv exists (creating + installing on first run),
-# then forwards all arguments to the `vllm_sim` CLI. Run it from anywhere.
+# then forwards all arguments to the `llm_sim` CLI. Run it from anywhere.
 #
 #   ./simulate.sh --workload synthetic --num-requests 30 --arrival-rate 50 \
 #       --prompt-len 32 128 --output-len 8 32 --num-blocks 500 --jsonl steps.jsonl
@@ -28,8 +28,8 @@ if [[ ! -x "$PY" ]]; then
   python3 -m venv "$VENV"
 fi
 
-if ! "$PY" -c "import vllm_sim" >/dev/null 2>&1; then
-  log "installing vllm-sim (pulls vllm==0.23.0; first run is slow) ..."
+if ! "$PY" -c "import llm_sim" >/dev/null 2>&1; then
+  log "installing llm-sim (pulls vllm==0.23.0; first run is slow) ..."
   "$PY" -m pip install -q --upgrade pip
   ( cd "$ROOT" && "$PY" -m pip install -e ".[dev]" )
 fi
@@ -37,7 +37,7 @@ fi
 # --- no args: print a quickstart instead of launching a large default run ---
 if [[ $# -eq 0 ]]; then
   cat >&2 <<'USAGE'
-Usage: ./simulate.sh [vllm_sim args...]
+Usage: ./simulate.sh [llm_sim args...]
        ./simulate.sh demo       # synthetic demo: batches evolving over time
        ./simulate.sh preempt    # tight-budget demo: forces a preemption
        ./simulate.sh --help     # full flag list
@@ -53,19 +53,19 @@ fi
 case "${1:-}" in
   demo)
     shift
-    exec "$PY" -m vllm_sim --workload synthetic \
+    exec "$PY" -m llm_sim --workload synthetic \
       --num-requests 30 --arrival-rate 50 \
       --prompt-len 32 128 --output-len 8 32 --seed 7 \
       --num-blocks 500 --latency 0.01 "$@"
     ;;
   preempt)
     shift
-    exec "$PY" -m vllm_sim --workload synthetic \
+    exec "$PY" -m llm_sim --workload synthetic \
       --num-requests 4 --interval 0.0 \
       --prompt-len 16 16 --output-len 16 16 \
       --num-blocks 8 --max-num-seqs 64 --max-model-len 4096 --latency 0.01 "$@"
     ;;
   *)
-    exec "$PY" -m vllm_sim "$@"
+    exec "$PY" -m llm_sim "$@"
     ;;
 esac

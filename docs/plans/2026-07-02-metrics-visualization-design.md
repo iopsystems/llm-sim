@@ -5,7 +5,7 @@
 Parquet export) shipped; the schema spike below resolved to
 `grouping_power=3`/`max_value_power=64` → 496 buckets, cumulative, `List<UInt64>`
 `<metric>:buckets` columns with mandatory grouping metadata (see
-`vllm_sim/export/`).
+`llm_sim/export/`).
 
 ## Goal
 
@@ -43,7 +43,7 @@ Immediate in-terminal dashboard, stdlib only. Rendered at end of a run and
 re-runnable on any saved JSONL. NOT per-step streaming (a fast batch sim would
 emit thousands of frames); "live" = immediate, no external tooling.
 
-- **Module:** `vllm_sim/viz.py`. Pure functions, no vLLM/pyarrow/rezolus imports.
+- **Module:** `llm_sim/viz.py`. Pure functions, no vLLM/pyarrow/rezolus imports.
 - **Primitives (TDD):**
   - `_sparkline(values) -> str` — 8-level Unicode blocks `▁▂▃▄▅▆▇█`; empty→"",
     constant series→flat, normalized to the series' own range.
@@ -55,7 +55,7 @@ emit thousands of frames); "live" = immediate, no external tooling.
 - **Entry points (shared renderer):**
   - `--viz` flag on the run → render from in-memory records to stderr (stdout
     stays clean for piping).
-  - `python -m vllm_sim.viz steps.jsonl` → re-render a saved run to stdout.
+  - `python -m llm_sim.viz steps.jsonl` → re-render a saved run to stdout.
 
 Example (illustrative):
 
@@ -77,7 +77,7 @@ Rezolus is the rich renderer (quantile heatmaps over time, A/B diff heatmaps).
 Our job: emit a Rezolus-compatible **Parquet** artifact from the JSONL. ALL
 rezolus/pyarrow/histogram deps confined here, strictly post-run.
 
-- **Module:** `vllm_sim/export/rezolus.py`, behind optional extra
+- **Module:** `llm_sim/export/rezolus.py`, behind optional extra
   `pip install -e ".[rezolus]"`. Reads JSONL only; never touches the sim core or
   Track 1.
 - **Model:**
@@ -94,7 +94,7 @@ rezolus/pyarrow/histogram deps confined here, strictly post-run.
 ## Dependency boundary (the key constraint)
 
 ```
-sim core (vllm_sim/*, no viz deps)
+sim core (llm_sim/*, no viz deps)
         │ writes
         ▼
    steps.jsonl  ── canonical ──┐

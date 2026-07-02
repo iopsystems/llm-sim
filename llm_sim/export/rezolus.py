@@ -24,7 +24,7 @@ import argparse
 import json
 from typing import Dict, List, Optional, Tuple
 
-from vllm_sim.export.histogram import LogLinearHistogram
+from llm_sim.export.histogram import LogLinearHistogram
 
 # The faithful scheduler-dynamics metrics worth a distribution-over-time view.
 DEFAULT_METRICS = ["tokens_scheduled", "num_running", "blocks_used", "num_waiting"]
@@ -92,7 +92,7 @@ def write_parquet(
     interval_ns: Optional[int] = None,
     target_rows: int = 150,
     base_epoch_ns: int = 0,
-    source: str = "vllm-sim",
+    source: str = "llm-sim",
 ) -> dict:
     """Write a Rezolus-viewer-compatible Parquet file. Returns a small manifest."""
     try:
@@ -153,7 +153,7 @@ def _load_jsonl(path: str) -> list:
 
 def main(argv: Optional[List[str]] = None) -> dict:
     p = argparse.ArgumentParser(
-        prog="vllm_sim.export.rezolus",
+        prog="llm_sim.export.rezolus",
         description="Convert a run's per-step JSONL to a Rezolus-compatible Parquet.",
     )
     p.add_argument("jsonl", help="per-step JSONL from a sim run")

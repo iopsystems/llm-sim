@@ -1,5 +1,5 @@
-from vllm_sim.workload.base import RequestSpec, WorkloadSource
-from vllm_sim.workload.synthetic import SyntheticWorkload
+from llm_sim.workload.base import RequestSpec, WorkloadSource
+from llm_sim.workload.synthetic import SyntheticWorkload
 
 
 def _cfg(**kw):

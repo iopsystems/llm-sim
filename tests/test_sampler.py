@@ -1,9 +1,9 @@
 from vllm.v1.outputs import ModelRunnerOutput
 
-from vllm_sim.harness.builder import build_scheduler
-from vllm_sim.sampler import build_runner_output
-from vllm_sim.workload.base import RequestSpec
-from vllm_sim.workload.factory import RequestFactory
+from llm_sim.harness.builder import build_scheduler
+from llm_sim.sampler import build_runner_output
+from llm_sim.workload.base import RequestSpec
+from llm_sim.workload.factory import RequestFactory
 
 BLOCK = 16
 

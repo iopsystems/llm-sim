@@ -1,4 +1,4 @@
-from vllm_sim.cost.constant import ConstantCostModel
+from llm_sim.cost.constant import ConstantCostModel
 
 
 def test_returns_fixed_latency_regardless_of_input():
@@ -8,6 +8,6 @@ def test_returns_fixed_latency_regardless_of_input():
 
 
 def test_is_a_cost_model():
-    from vllm_sim.cost.base import CostModel
+    from llm_sim.cost.base import CostModel
     model = ConstantCostModel(latency_s=0.02)
     assert isinstance(model, CostModel)

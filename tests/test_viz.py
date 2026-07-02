@@ -1,6 +1,6 @@
 import json
 
-from vllm_sim.viz import _downsample, _sparkline, main, render
+from llm_sim.viz import _downsample, _sparkline, main, render
 
 BLOCKS = "▁▂▃▄▅▆▇█"
 
@@ -100,7 +100,7 @@ def test_render_empty_records_is_graceful():
 
 def test_render_accepts_steprecord_objects():
     # render must accept both dicts and StepRecord dataclass instances.
-    from vllm_sim.metrics import MetricsRecorder
+    from llm_sim.metrics import MetricsRecorder
     m = MetricsRecorder()
     for r in _records(4):
         m.record(**r)
@@ -108,7 +108,7 @@ def test_render_accepts_steprecord_objects():
     assert "4 steps" in out
 
 
-# ---- standalone CLI (python -m vllm_sim.viz steps.jsonl) -------------------
+# ---- standalone CLI (python -m llm_sim.viz steps.jsonl) -------------------
 
 def test_main_reads_jsonl_and_prints_dashboard(tmp_path, capsys):
     path = tmp_path / "steps.jsonl"

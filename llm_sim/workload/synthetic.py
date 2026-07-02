@@ -9,7 +9,7 @@ so a given config reproduces byte-identical specs.
 import random
 from typing import Iterable, Optional, Tuple
 
-from vllm_sim.workload.base import RequestSpec
+from llm_sim.workload.base import RequestSpec
 
 
 class SyntheticWorkload:

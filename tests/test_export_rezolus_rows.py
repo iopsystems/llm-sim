@@ -1,5 +1,5 @@
-from vllm_sim.export.histogram import LogLinearHistogram
-from vllm_sim.export.rezolus import build_histogram_rows, choose_interval_ns
+from llm_sim.export.histogram import LogLinearHistogram
+from llm_sim.export.rezolus import build_histogram_rows, choose_interval_ns
 
 SEC = 1_000_000_000
 IDX = LogLinearHistogram().value_to_index  # value -> bucket index

@@ -1,7 +1,7 @@
 from vllm.v1.request import Request
 
-from vllm_sim.workload.base import RequestSpec
-from vllm_sim.workload.factory import RequestFactory
+from llm_sim.workload.base import RequestSpec
+from llm_sim.workload.factory import RequestFactory
 
 
 def _spec(**kw):
