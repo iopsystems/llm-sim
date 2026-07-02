@@ -34,6 +34,30 @@ def test_synthetic_run_writes_jsonl_and_summary(tmp_path):
     assert all(json.loads(l)["blocks_used"] <= json.loads(l)["num_blocks"] for l in lines)
 
 
+def test_viz_flag_renders_dashboard_to_stderr(tmp_path, capsys):
+    summary = main(
+        [
+            "--workload", "trace", "--trace", str(_two_req_trace(tmp_path)),
+            "--num-blocks", "100", "--latency", "0.01", "--viz",
+        ]
+    )
+    err = capsys.readouterr().err
+    assert summary["total_finished"] == 2
+    # The dashboard is rendered to stderr (stdout stays clean).
+    assert "steps, virtual time" in err
+    assert "batch tokens" in err
+
+
+def _two_req_trace(tmp_path):
+    trace = tmp_path / "trace.csv"
+    trace.write_text(
+        "request_id,arrival_time,prompt_len,output_len\n"
+        "a,0.0,16,2\n"
+        "b,0.0,16,2\n"
+    )
+    return trace
+
+
 def test_trace_run_from_csv(tmp_path):
     trace = tmp_path / "trace.csv"
     trace.write_text(

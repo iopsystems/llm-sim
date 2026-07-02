@@ -50,6 +50,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # Output
     p.add_argument("--jsonl", type=str, default=None, help="write per-step records here")
     p.add_argument("--summary", type=str, default=None, help="write summary JSON here")
+    p.add_argument("--viz", action="store_true",
+                   help="render a terminal dashboard of the run to stderr")
 
     return p
 
@@ -102,6 +104,10 @@ def main(argv: Optional[List[str]] = None) -> dict:
     if args.summary:
         with open(args.summary, "w") as f:
             json.dump(summary, f, indent=2)
+
+    if args.viz:
+        from vllm_sim.viz import render
+        print(render(metrics.records), file=sys.stderr)
 
     # Human-readable summary to stderr so stdout stays clean for piping.
     print(json.dumps(summary, indent=2), file=sys.stderr)

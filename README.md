@@ -53,6 +53,36 @@ args to the CLI (run it from anywhere):
 ./simulate.sh --workload trace --trace mytrace.csv --num-blocks 500
 ```
 
+### Visualization
+
+`--viz` renders a lightweight terminal dashboard (Unicode sparklines, zero extra
+deps) of the faithful scheduler-dynamics KPIs after a run:
+
+```bash
+./simulate.sh demo --viz
+```
+```
+vLLM scheduler sim — 71 steps, virtual time 0.71s
+batch tokens  ▃▂▁▂▁█▁▁▁▅▁▂▄▄▄▄▄▁▇▁▃▄▁▁▆▃█▁▇▄▁▁ …  peak 229
+decode reqs   ▁▁▂▂▂▄▄▄▃▃▄▄▅▅▆▆▇▇▇█▇▇▇▆▆▇██▇██▇ …  peak 15
+running       ▁▂▂▂▂▄▄▄▃▄▄▅▅▅▆▆▇▇█▇▇▇▇▆▇██▇██▇▇ …  peak 15
+KV blocks     ▁▁▁▁▁▃▃▃▃▃▃▄▄▄▅▅▅▅▆▆▆▆▆▆▇▇▇▆▇█▇▇ …  peak 99 / 500  (20%)
+finished      ▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▂▃▃▃▄▄▄▄▄▅▅▅▅▆ …  30 done
+preemptions   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ …  0 total
+```
+
+Re-render any saved run's JSONL later (no re-run needed):
+
+```bash
+python -m vllm_sim.viz steps.jsonl
+```
+
+KPIs are scheduler-dynamics only (batch composition, queue occupancy, KV-block
+pressure, progress) — faithful under any cost model. Latency/throughput are
+intentionally omitted (degenerate under the constant cost model). Rich offline
+visualization via Rezolus is planned as an opt-in post-processing export; see
+`docs/plans/2026-07-02-metrics-visualization-design.md`.
+
 Or invoke the CLI yourself once the venv is set up:
 
 ```bash
