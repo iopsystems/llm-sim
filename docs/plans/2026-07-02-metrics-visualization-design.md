@@ -83,8 +83,12 @@ rezolus/pyarrow/histogram deps confined here, strictly post-run.
 - **Model:**
   - `vclock → timestamp` column (virtual seconds on the heatmap x-axis).
   - **Histogram-per-interval:** bucket steps by `vclock`; per interval build a
-    **log-linear** histogram (iopsystems/histogram layout) of each metric's
-    values across that interval's steps. This is the shape Rezolus heatmaps render.
+    **log-linear** histogram of each metric's values across that interval's
+    steps. This is the shape Rezolus heatmaps render. Bucketing uses the
+    canonical `h2histogram` library (iopsystems, pure Python, zero deps),
+    adapted behind `export/histogram.py` — replacing an earlier hand-port of the
+    Rust `value_to_index`, verified byte-identical (496 buckets at
+    grouping_power=3/max_value_power=64).
   - Metrics histogrammed: `tokens_scheduled`, `num_running`, `blocks_used`
     (occupancy), `num_waiting`.
 - **BLOCKED ON:** exact Rezolus Parquet histogram schema — column layout per

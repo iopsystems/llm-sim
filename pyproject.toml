@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-rezolus = ["pyarrow>=14"]
+rezolus = ["pyarrow>=14", "h2histogram>=0.1"]
 
 [project.scripts]
 llm-sim = "llm_sim.cli:main"

@@ -5,6 +5,7 @@ import pytest
 
 pa = pytest.importorskip("pyarrow")
 pq = pytest.importorskip("pyarrow.parquet")
+pytest.importorskip("h2histogram")
 
 from llm_sim.export.rezolus import write_parquet
 

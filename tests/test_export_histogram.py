@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("h2histogram")  # export stage dep ([rezolus] extra)
+
 from llm_sim.export.histogram import LogLinearHistogram
 
 

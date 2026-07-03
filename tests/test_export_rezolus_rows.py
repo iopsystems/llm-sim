@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("h2histogram")  # export stage dep ([rezolus] extra)
+
 from llm_sim.export.histogram import LogLinearHistogram
 from llm_sim.export.rezolus import build_histogram_rows, choose_interval_ns
 
