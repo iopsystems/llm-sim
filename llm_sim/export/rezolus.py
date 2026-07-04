@@ -29,6 +29,18 @@ from llm_sim.export.histogram import LogLinearHistogram
 # The faithful scheduler-dynamics metrics worth a distribution-over-time view.
 DEFAULT_METRICS = ["tokens_scheduled", "num_running", "blocks_used", "num_waiting"]
 
+# Human-readable descriptions carried into each histogram column's field
+# metadata (the `description` key, as metriken-exposition does), so the metric's
+# meaning travels with the file and surfaces in the Rezolus viewer.
+METRIC_DESCRIPTIONS = {
+    "tokens_scheduled": "Total tokens scheduled per engine step (prefill chunks + decode tokens across the batch).",
+    "num_running": "Requests in the RUNNING state (batch concurrency) per step.",
+    "blocks_used": "KV-cache blocks in use per step.",
+    "num_waiting": "Requests queued in the WAITING state per step.",
+    "prefill_reqs": "Requests doing a prefill chunk this step.",
+    "decode_reqs": "Requests doing a decode this step.",
+}
+
 GROUPING_POWER = 3
 MAX_VALUE_POWER = 64
 _MS_NS = 1_000_000
@@ -93,6 +105,7 @@ def write_parquet(
     target_rows: int = 150,
     base_epoch_ns: int = 0,
     source: str = "llm-sim",
+    descriptions: Optional[dict] = None,
 ) -> dict:
     """Write a Rezolus-viewer-compatible Parquet file. Returns a small manifest."""
     try:
@@ -113,20 +126,29 @@ def write_parquet(
 
     ts_ns, cols = build_histogram_rows(recs, metrics, interval_ns, base_ns=base_epoch_ns)
 
+    descs = {**METRIC_DESCRIPTIONS, **(descriptions or {})}
+
     item = pa.field("item", pa.uint64(), nullable=True)
     list_type = pa.list_(item)
-    hist_meta = {
-        "grouping_power": str(GROUPING_POWER),
-        "max_value_power": str(MAX_VALUE_POWER),
-        "metric_type": "histogram",
-        "source": source,
-    }
+
+    def _hist_meta(metric: str) -> dict:
+        meta = {
+            "grouping_power": str(GROUPING_POWER),
+            "max_value_power": str(MAX_VALUE_POWER),
+            "metric_type": "histogram",
+            "source": source,
+        }
+        desc = descs.get(metric)
+        if desc:
+            meta["description"] = desc
+        return meta
+
     schema = pa.schema(
         [
             pa.field("timestamp", pa.uint64(), nullable=False,
                      metadata={"metric_type": "timestamp", "unit": "nanoseconds"}),
             *[
-                pa.field(f"{m}:buckets", list_type, nullable=True, metadata=hist_meta)
+                pa.field(f"{m}:buckets", list_type, nullable=True, metadata=_hist_meta(m))
                 for m in metrics
             ],
         ],

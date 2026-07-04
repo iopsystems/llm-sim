@@ -48,6 +48,25 @@ def test_histogram_columns_are_list_uint64(written):
         assert f.type.value_type == pa.uint64()
 
 
+def test_histogram_columns_carry_descriptions(written):
+    # Rezolus carries a metric's description as a `description` field-metadata key
+    # (metriken-exposition snapshotter). Every exported metric should have one.
+    path, _ = written
+    schema = pq.read_schema(path)
+    for m in ["tokens_scheduled", "num_running", "blocks_used", "num_waiting"]:
+        meta = schema.field(f"{m}:buckets").metadata
+        assert b"description" in meta
+        assert len(meta[b"description"]) > 0
+
+
+def test_custom_descriptions_override_defaults(tmp_path):
+    path = tmp_path / "c.parquet"
+    write_parquet(_records(), str(path), interval_ns=50_000_000,
+                  descriptions={"num_running": "my custom desc"})
+    meta = pq.read_schema(path).field("num_running:buckets").metadata
+    assert meta[b"description"] == b"my custom desc"
+
+
 def test_histogram_columns_carry_grouping_metadata(written):
     # The viewer SILENTLY DROPS a histogram column lacking these -> mandatory.
     path, _ = written
