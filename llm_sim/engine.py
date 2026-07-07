@@ -15,11 +15,11 @@ from typing import Iterable, Optional
 
 from vllm.v1.request import RequestStatus
 
-from vllm_sim.clock import VirtualClock
-from vllm_sim.cost.base import CostModel
-from vllm_sim.metrics import MetricsRecorder
-from vllm_sim.sampler import build_runner_output
-from vllm_sim.workload.base import RequestSpec
+from llm_sim.clock import VirtualClock
+from llm_sim.cost.base import CostModel
+from llm_sim.metrics import MetricsRecorder
+from llm_sim.sampler import build_runner_output
+from llm_sim.workload.base import RequestSpec
 
 
 class SimLoop:

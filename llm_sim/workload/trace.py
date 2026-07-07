@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Iterable, Union
 
-from vllm_sim.workload.base import RequestSpec
+from llm_sim.workload.base import RequestSpec
 
 
 class TraceWorkload:

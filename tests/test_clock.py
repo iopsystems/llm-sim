@@ -1,4 +1,4 @@
-from vllm_sim.clock import VirtualClock
+from llm_sim.clock import VirtualClock
 
 
 def test_starts_at_zero_by_default():

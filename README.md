@@ -1,4 +1,4 @@
-# vllm-sim — vLLM V1 scheduler-in-isolation simulator
+# llm-sim — vLLM V1 scheduler-in-isolation simulator
 
 Run vLLM's **real** V1 `Scheduler` / `KVCacheManager` / `BlockPool` without a
 GPU, over a **virtual clock**, to reproduce its control-plane decisions —
@@ -53,25 +53,74 @@ args to the CLI (run it from anywhere):
 ./simulate.sh --workload trace --trace mytrace.csv --num-blocks 500
 ```
 
+### Visualization
+
+`--viz` renders a lightweight terminal dashboard (Unicode sparklines, zero extra
+deps) of the faithful scheduler-dynamics KPIs after a run:
+
+```bash
+./simulate.sh demo --viz
+```
+```
+vLLM scheduler sim — 71 steps, virtual time 0.71s
+batch tokens  ▃▂▁▂▁█▁▁▁▅▁▂▄▄▄▄▄▁▇▁▃▄▁▁▆▃█▁▇▄▁▁ …  peak 229
+decode reqs   ▁▁▂▂▂▄▄▄▃▃▄▄▅▅▆▆▇▇▇█▇▇▇▆▆▇██▇██▇ …  peak 15
+running       ▁▂▂▂▂▄▄▄▃▄▄▅▅▅▆▆▇▇█▇▇▇▇▆▇██▇██▇▇ …  peak 15
+KV blocks     ▁▁▁▁▁▃▃▃▃▃▃▄▄▄▅▅▅▅▆▆▆▆▆▆▇▇▇▆▇█▇▇ …  peak 99 / 500  (20%)
+finished      ▁▁▁▁▁▁▁▁▁▁▁▁▂▂▂▂▂▂▂▃▃▃▄▄▄▄▄▅▅▅▅▆ …  30 done
+preemptions   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁ …  0 total
+```
+
+Re-render any saved run's JSONL later (no re-run needed):
+
+```bash
+python -m llm_sim.viz steps.jsonl
+```
+
+KPIs are scheduler-dynamics only (batch composition, queue occupancy, KV-block
+pressure, progress) — faithful under any cost model. Latency/throughput are
+intentionally omitted (degenerate under the constant cost model).
+
+### Rezolus export (optional, offline heatmaps)
+
+For rich distribution-over-time views, a post-processing step converts a run's
+JSONL into a [Rezolus](https://github.com/iopsystems/rezolus)-compatible Parquet
+(log-linear histograms, `grouping_power=3`/`max_value_power=64` → 496 buckets,
+cumulative per virtual-time interval; `vclock` maps to the timestamp axis). All
+heavy deps are confined to this opt-in extra — the sim core and `--viz` never
+import them.
+
+```bash
+pip install -e ".[rezolus]"                       # pulls pyarrow
+python -m llm_sim --workload synthetic ... --jsonl steps.jsonl
+python -m llm_sim.export.rezolus steps.jsonl -o run.parquet --target-rows 120
+# then open run.parquet in the Rezolus viewer (quantile / heatmap over time)
+```
+
+Metrics histogrammed by default: `tokens_scheduled`, `num_running`,
+`blocks_used`, `num_waiting` (override with `--metrics`). Design +
+schema-compatibility notes:
+`docs/plans/2026-07-02-metrics-visualization-design.md`.
+
 Or invoke the CLI yourself once the venv is set up:
 
 ```bash
 # Synthetic workload (Poisson arrivals), dump per-step JSONL + summary:
-.venv/bin/python -m vllm_sim --workload synthetic \
+.venv/bin/python -m llm_sim --workload synthetic \
     --num-requests 30 --arrival-rate 50 \
     --prompt-len 32 128 --output-len 8 32 --seed 7 \
     --num-blocks 500 --latency 0.01 \
     --jsonl steps.jsonl --summary summary.json
 
 # Tight block budget -> preemptions:
-.venv/bin/python -m vllm_sim --workload synthetic \
+.venv/bin/python -m llm_sim --workload synthetic \
     --num-requests 4 --interval 0.0 \
     --prompt-len 16 16 --output-len 16 16 \
     --num-blocks 8 --max-num-seqs 64 --max-model-len 4096 \
     --jsonl preempt.jsonl
 
 # Replay a trace (CSV or JSONL with request_id,arrival_time,prompt_len,output_len):
-.venv/bin/python -m vllm_sim --workload trace --trace mytrace.csv --num-blocks 500
+.venv/bin/python -m llm_sim --workload trace --trace mytrace.csv --num-blocks 500
 ```
 
 Each step is recorded as JSONL (`vclock`, `num_running`, `num_waiting`,
@@ -92,7 +141,7 @@ cost/      CostModel.step_latency(...)  -> ConstantCostModel (MVP)
 clock      VirtualClock: now / advance / fast_forward_to  (sim-loop-owned)
 metrics    per-step records -> JSONL + summary
 engine     SimLoop: admit -> schedule -> sample -> update -> advance -> record
-cli        argparse entry point (python -m vllm_sim)
+cli        argparse entry point (python -m llm_sim)
 ```
 
 ### The simulation loop

@@ -2,11 +2,11 @@
 constant cost model and assert the emergent control-plane behavior.
 """
 
-from vllm_sim.cost.constant import ConstantCostModel
-from vllm_sim.engine import SimLoop
-from vllm_sim.harness.builder import build_scheduler
-from vllm_sim.workload.base import RequestSpec
-from vllm_sim.workload.factory import RequestFactory
+from llm_sim.cost.constant import ConstantCostModel
+from llm_sim.engine import SimLoop
+from llm_sim.harness.builder import build_scheduler
+from llm_sim.workload.base import RequestSpec
+from llm_sim.workload.factory import RequestFactory
 
 BLOCK = 16
 

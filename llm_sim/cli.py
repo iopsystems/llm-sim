@@ -1,7 +1,7 @@
 """Command-line entry point: run a scenario, dump per-step JSONL + a summary.
 
-    python -m vllm_sim --workload synthetic --num-requests 50 --arrival-rate 20 ...
-    python -m vllm_sim --workload trace --trace path/to/trace.csv ...
+    python -m llm_sim --workload synthetic --num-requests 50 --arrival-rate 20 ...
+    python -m llm_sim --workload trace --trace path/to/trace.csv ...
 """
 
 import argparse
@@ -9,16 +9,16 @@ import json
 import sys
 from typing import List, Optional
 
-from vllm_sim.cost.constant import ConstantCostModel
-from vllm_sim.engine import SimLoop
-from vllm_sim.harness.builder import build_scheduler
-from vllm_sim.workload.factory import RequestFactory
-from vllm_sim.workload.synthetic import SyntheticWorkload
-from vllm_sim.workload.trace import TraceWorkload
+from llm_sim.cost.constant import ConstantCostModel
+from llm_sim.engine import SimLoop
+from llm_sim.harness.builder import build_scheduler
+from llm_sim.workload.factory import RequestFactory
+from llm_sim.workload.synthetic import SyntheticWorkload
+from llm_sim.workload.trace import TraceWorkload
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="vllm_sim", description=__doc__)
+    p = argparse.ArgumentParser(prog="llm_sim", description=__doc__)
 
     p.add_argument("--workload", choices=["synthetic", "trace"], default="synthetic")
 
@@ -50,6 +50,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # Output
     p.add_argument("--jsonl", type=str, default=None, help="write per-step records here")
     p.add_argument("--summary", type=str, default=None, help="write summary JSON here")
+    p.add_argument("--viz", action="store_true",
+                   help="render a terminal dashboard of the run to stderr")
 
     return p
 
@@ -102,6 +104,10 @@ def main(argv: Optional[List[str]] = None) -> dict:
     if args.summary:
         with open(args.summary, "w") as f:
             json.dump(summary, f, indent=2)
+
+    if args.viz:
+        from llm_sim.viz import render
+        print(render(metrics.records), file=sys.stderr)
 
     # Human-readable summary to stderr so stdout stays clean for piping.
     print(json.dumps(summary, indent=2), file=sys.stderr)

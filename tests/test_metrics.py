@@ -1,6 +1,6 @@
 import json
 
-from vllm_sim.metrics import MetricsRecorder
+from llm_sim.metrics import MetricsRecorder
 
 
 def _rec(m, **kw):

@@ -1,8 +1,8 @@
 from vllm.v1.core.sched.scheduler import Scheduler
 
-from vllm_sim.harness.builder import build_scheduler
-from vllm_sim.workload.base import RequestSpec
-from vllm_sim.workload.factory import RequestFactory
+from llm_sim.harness.builder import build_scheduler
+from llm_sim.workload.base import RequestSpec
+from llm_sim.workload.factory import RequestFactory
 
 
 def test_builds_a_live_scheduler():

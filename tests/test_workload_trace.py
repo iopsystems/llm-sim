@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from vllm_sim.workload.base import RequestSpec, WorkloadSource
-from vllm_sim.workload.trace import TraceWorkload
+from llm_sim.workload.base import RequestSpec, WorkloadSource
+from llm_sim.workload.trace import TraceWorkload
 
 EXPECTED = [
     RequestSpec(request_id="a", arrival_time=0.0, prompt_len=10, output_len=5),

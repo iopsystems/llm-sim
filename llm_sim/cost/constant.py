@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from vllm_sim.cost.base import CostModel
+from llm_sim.cost.base import CostModel
 
 
 class ConstantCostModel(CostModel):
