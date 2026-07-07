@@ -127,32 +127,34 @@ def write_parquet(
     ts_ns, cols = build_histogram_rows(recs, metrics, interval_ns, base_ns=base_epoch_ns)
 
     descs = {**METRIC_DESCRIPTIONS, **(descriptions or {})}
+    # Rezolus reads descriptions from a single file-level `descriptions` footer
+    # key: a JSON map {metric_name -> help text}, keyed by the bare metric name
+    # (recorder/mod.rs:343, viewer section_views.js:141). NOT per-column metadata.
+    desc_map = {m: descs[m] for m in metrics if descs.get(m)}
 
     item = pa.field("item", pa.uint64(), nullable=True)
     list_type = pa.list_(item)
+    hist_meta = {
+        "grouping_power": str(GROUPING_POWER),
+        "max_value_power": str(MAX_VALUE_POWER),
+        "metric_type": "histogram",
+        "source": source,
+    }
 
-    def _hist_meta(metric: str) -> dict:
-        meta = {
-            "grouping_power": str(GROUPING_POWER),
-            "max_value_power": str(MAX_VALUE_POWER),
-            "metric_type": "histogram",
-            "source": source,
-        }
-        desc = descs.get(metric)
-        if desc:
-            meta["description"] = desc
-        return meta
+    file_meta = {"sampling_interval_ms": str(sampling_interval_ms), "source": source}
+    if desc_map:
+        file_meta["descriptions"] = json.dumps(desc_map)
 
     schema = pa.schema(
         [
             pa.field("timestamp", pa.uint64(), nullable=False,
                      metadata={"metric_type": "timestamp", "unit": "nanoseconds"}),
             *[
-                pa.field(f"{m}:buckets", list_type, nullable=True, metadata=_hist_meta(m))
+                pa.field(f"{m}:buckets", list_type, nullable=True, metadata=hist_meta)
                 for m in metrics
             ],
         ],
-        metadata={"sampling_interval_ms": str(sampling_interval_ms), "source": source},
+        metadata=file_meta,
     )
     arrays = [pa.array(ts_ns, pa.uint64())]
     arrays += [pa.array(cols[m], type=list_type) for m in metrics]

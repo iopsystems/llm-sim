@@ -1,6 +1,8 @@
 """Validates the emitted Parquet against the exact schema contract the Rezolus
 viewer (metriken-query) enforces. Needs pyarrow (the [rezolus] extra)."""
 
+import json
+
 import pytest
 
 pa = pytest.importorskip("pyarrow")
@@ -48,23 +50,33 @@ def test_histogram_columns_are_list_uint64(written):
         assert f.type.value_type == pa.uint64()
 
 
-def test_histogram_columns_carry_descriptions(written):
-    # Rezolus carries a metric's description as a `description` field-metadata key
-    # (metriken-exposition snapshotter). Every exported metric should have one.
+def test_descriptions_are_a_file_level_json_map(written):
+    # Rezolus reads descriptions from a single file-level `descriptions` footer
+    # key: a JSON object {metric_name -> help text}, keyed by BARE metric name
+    # (viewer section_views.js: meta.descriptions; recorder mod.rs:343).
     path, _ = written
-    schema = pq.read_schema(path)
+    meta = pq.read_schema(path).metadata
+    assert b"descriptions" in meta
+    d = json.loads(meta[b"descriptions"])
     for m in ["tokens_scheduled", "num_running", "blocks_used", "num_waiting"]:
-        meta = schema.field(f"{m}:buckets").metadata
-        assert b"description" in meta
-        assert len(meta[b"description"]) > 0
+        assert m in d and d[m]
+    # keyed by bare metric name, not the `:buckets` column name
+    assert "num_running:buckets" not in d
+
+
+def test_columns_do_not_carry_description_field_metadata(written):
+    # Descriptions must NOT live as per-column field metadata.
+    path, _ = written
+    meta = pq.read_schema(path).field("num_running:buckets").metadata or {}
+    assert b"description" not in meta
 
 
 def test_custom_descriptions_override_defaults(tmp_path):
     path = tmp_path / "c.parquet"
     write_parquet(_records(), str(path), interval_ns=50_000_000,
                   descriptions={"num_running": "my custom desc"})
-    meta = pq.read_schema(path).field("num_running:buckets").metadata
-    assert meta[b"description"] == b"my custom desc"
+    d = json.loads(pq.read_schema(str(path)).metadata[b"descriptions"])
+    assert d["num_running"] == "my custom desc"
 
 
 def test_histogram_columns_carry_grouping_metadata(written):
