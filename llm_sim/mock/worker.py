@@ -37,6 +37,8 @@ _kv_cache_bytes = DEFAULT_KV_CACHE_BYTES
 def set_kv_cache_bytes(n: int | None) -> None:
     """Set the KV budget for subsequently built engines (None = default 1 GiB)."""
     global _kv_cache_bytes
+    if n is not None and n <= 0:
+        raise ValueError(f"kv_cache_bytes must be positive, got {n}")
     _kv_cache_bytes = DEFAULT_KV_CACHE_BYTES if n is None else int(n)
 
 

@@ -8,15 +8,20 @@ vllm/v1/engine/core.py by ``get_scheduler_cls()``); ``schedule()`` is the real
 method, observed, not modified.
 """
 
+from typing import TYPE_CHECKING
+
 from vllm.v1.core.sched.scheduler import Scheduler
+
+if TYPE_CHECKING:
+    from vllm.v1.core.sched.output import SchedulerOutput
 
 
 class SimScheduler(Scheduler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.last_scheduler_output = None
+        self.last_scheduler_output: "SchedulerOutput | None" = None
 
-    def schedule(self):
+    def schedule(self) -> "SchedulerOutput":
         output = super().schedule()
         self.last_scheduler_output = output
         return output

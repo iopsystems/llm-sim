@@ -14,6 +14,9 @@ KV sizing is sim-owned, two knobs:
   limit — 2048 for opt-125m, ~144 MiB fp32 — because ModelConfig validation
   rejects anything larger than max_position_embeddings.)
 - ``num_blocks``: exact block count via vLLM's own num_gpu_blocks_override.
+  When both num_blocks and kv_cache_bytes are given the override wins, but
+  vLLM's KV capacity check still runs against the overridden block count, so
+  max_model_len must fit num_blocks x block_size tokens.
   NOTE: KV blocks are really allocated as CPU tensors (~1.125 MiB/block for
   opt-125m fp32 at block_size=16) — large counts cost real host RAM.
 """
@@ -23,8 +26,9 @@ from vllm.v1.engine.core import EngineCore
 from vllm.v1.executor.abstract import Executor
 
 import llm_sim.mock.worker as mock_worker
+from llm_sim.harness.scheduler import SimScheduler
 
-SIM_SCHEDULER_CLS = "llm_sim.harness.scheduler.SimScheduler"
+SIM_SCHEDULER_CLS = f"{SimScheduler.__module__}.{SimScheduler.__qualname__}"
 
 
 def build_engine_core(
