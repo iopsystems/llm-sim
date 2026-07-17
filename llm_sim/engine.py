@@ -68,6 +68,9 @@ class SimLoop:
                     continue
                 break
 
+            # Clear the capture so the assert below catches a stale value from a
+            # previous iteration, not just a never-set one on the first step.
+            scheduler.last_scheduler_output = None
             self.core.step()
             scheduler_output = scheduler.last_scheduler_output
             # Invariant: the has_requests() guard above matches EngineCore.step()'s

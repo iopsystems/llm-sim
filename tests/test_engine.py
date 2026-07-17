@@ -71,7 +71,10 @@ def test_all_requests_finish_and_blocks_never_exceed_budget():
     metrics = _run(specs, num_blocks=100, latency=0.005)
     s = metrics.summary()
     assert s["total_finished"] == 5
-    assert all(r.blocks_used <= r.num_blocks for r in metrics.records)
+    # Peak KV usage is deterministic: 5 requests x 2 blocks each at peak
+    # (16 prompt + 3 output = 19 tokens -> 2 blocks at block_size 16), plus
+    # the always-allocated null block that blocks_used counts.
+    assert s["peak_blocks_used"] == 11
 
 
 def test_staggered_arrival_fast_forwards_idle_gap():
@@ -95,10 +98,15 @@ def test_tight_block_budget_forces_preemption():
     # 16+48=64 tokens = 4 blocks each -> peak demand 16 > 11 -> preemption,
     # and every request still fits individually -> all finish.
     specs = [RequestSpec(f"r{i}", 0.0, 16, 48) for i in range(4)]
+    # max_num_seqs=64 makes the sequence cap non-binding, so the block budget
+    # is the only constraint forcing preemption.
     metrics = _run(
         specs, num_blocks=12, latency=0.01, max_num_seqs=64, max_model_len=128
     )
     s = metrics.summary()
     assert s["total_preemptions"] >= 1
     assert s["total_finished"] == 4
-    assert all(r.blocks_used <= r.num_blocks for r in metrics.records)
+    # Usable budget is 11 blocks (12 minus the always-allocated null block,
+    # which blocks_used counts): the scheduler must stay within it, i.e. at
+    # most 10 usable + 1 null.
+    assert s["peak_blocks_used"] <= 11
