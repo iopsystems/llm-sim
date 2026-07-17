@@ -81,6 +81,16 @@ def _build_workload(args):
     )
 
 
+# The two messages check_enough_kv_cache_memory can raise
+# (vllm/v1/core/kv_cache_utils.py:720 and :740 in the pinned vllm==0.23.0).
+# Only these get translated into KV-knob advice; note the first one does NOT
+# contain the words "KV cache".
+_KV_CAPACITY_SIGNATURES = (
+    "No available memory for the cache blocks",
+    "KV cache is needed, which is larger than the available KV cache",
+)
+
+
 def main(argv: Optional[List[str]] = None) -> dict:
     args = _build_parser().parse_args(argv)
 
@@ -97,14 +107,21 @@ def main(argv: Optional[List[str]] = None) -> dict:
             enable_chunked_prefill=not args.no_chunked_prefill,
         )
     except ValueError as e:
-        # vLLM's advice names knobs this CLI doesn't expose
-        # (gpu_memory_utilization); translate to our own flags but keep the
-        # original message -- it carries the estimated maximum model length.
-        raise SystemExit(
-            "engine rejected the KV cache config: "
-            f"{e}\n(llm_sim knobs: raise --num-blocks or --kv-cache-bytes, "
-            "or lower --max-model-len so one max-length request fits the budget)"
-        ) from e
+        msg = str(e)
+        if any(sig in msg for sig in _KV_CAPACITY_SIGNATURES):
+            # vLLM's advice names knobs this CLI doesn't expose
+            # (gpu_memory_utilization); translate to our own flags but keep
+            # the original message -- it carries the estimated maximum model
+            # length.
+            raise SystemExit(
+                "engine rejected the KV cache config: "
+                f"{msg}\n(llm_sim knobs: raise --num-blocks or --kv-cache-bytes, "
+                "or lower --max-model-len so one max-length request fits the budget)"
+            ) from e
+        # Any other ValueError (e.g. pydantic ValidationError from model
+        # config validation) is not a KV capacity problem; surface vLLM's
+        # message as-is, without the KV-knob advice.
+        raise SystemExit(f"engine rejected the configuration: {msg}") from e
     try:
         loop = SimLoop(
             core=core,

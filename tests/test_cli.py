@@ -128,3 +128,24 @@ def test_kv_config_rejection_reports_llm_sim_knobs():
     assert "--max-model-len" in msg
     # vLLM's original datum is preserved.
     assert "estimated maximum model length" in msg
+
+
+def test_non_kv_valueerror_is_not_mislabeled_as_kv_config():
+    # --max-model-len 4096 exceeds opt-125m's max_position_embeddings (2048),
+    # so pydantic's ValidationError (a ValueError subclass) fires from
+    # ModelConfig validation -- a config problem, not a KV capacity one. The
+    # CLI must surface vLLM's message without the KV-knob advice.
+    with pytest.raises(SystemExit) as excinfo:
+        main(
+            [
+                "--workload", "synthetic",
+                "--num-requests", "1",
+                "--max-model-len", "4096",
+            ]
+        )
+    msg = str(excinfo.value)
+    # vLLM's own validation message comes through...
+    assert "max_model_len (4096) is greater than the derived max_model_len" in msg
+    # ...but not the KV capacity diagnosis or its knob advice.
+    assert "KV cache config" not in msg
+    assert "llm_sim knobs" not in msg
