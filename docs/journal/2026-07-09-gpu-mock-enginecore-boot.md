@@ -1,8 +1,9 @@
 # v2: GPU-mock — boot the real vLLM stack in-process (EngineCore)
 
-**Status:** OPEN — spike returned **GO** (2026-07-17, see "Spike verdict"
-below); implementation (EngineCore-backed engine replacing the MVP SimLoop)
-pending.
+**Status:** CLOSED — **shipped** (2026-07-17). Spike returned **GO** (see
+"Spike verdict" below); the EngineCore-backed engine replaced the MVP SimLoop
+on branch `feat/v2-enginecore-engine`, landed via that branch's implementing
+PR (see "Implementation" below).
 
 **Opened:** 2026-07-09.
 
@@ -161,7 +162,115 @@ behind the `_model_forward` + `determine_available_memory` seams.
   stays out of v2 scope.
 - KV budget is a constant (`MOCK_KV_CACHE_BYTES = 1 GiB`); making it a sim
   config knob is part of the implementation (it drives `num_blocks`, hence
-  preemption).
+  preemption). — **Resolved in the implementation:**
+  `llm_sim.mock.worker.set_kv_cache_bytes()` (default
+  `DEFAULT_KV_CACHE_BYTES` = 1 GiB) plus CLI flags `--kv-cache-bytes` /
+  `--num-blocks`.
 - The virtual clock is not yet wired: EngineCore's step loop still runs on
   wall time. Charging `cost_model` virtual time at the `_model_forward` seam
-  is the core of the implementation work.
+  is the core of the implementation work. — **Resolved in the
+  implementation**, though loop-side rather than at `_model_forward` — see
+  deviation 1 below.
+
+## Implementation (shipped 2026-07-17)
+
+Landed on `feat/v2-enginecore-engine` (commits `03b17cf`..`d42b3e6` off
+`6dd96f3`, via the branch's implementing PR). The spike's replace decision
+executed as decided; what shipped:
+
+- `llm_sim/harness/enginecore.py` — `build_engine_core()`: boots a live
+  EngineCore (`load_format="dummy"`, `enforce_eager=True`, `dtype="float32"`,
+  `seed=42`); KV sizing is sim-owned via `num_gpu_blocks_override` (exact
+  block counts) or the analytic-budget knob
+  `llm_sim.mock.worker.set_kv_cache_bytes()` (`DEFAULT_KV_CACHE_BYTES` =
+  1 GiB); `SimScheduler` is injected by setting
+  `scheduler_config.scheduler_cls` after `create_engine_config()` — safe
+  because EngineCore resolves it at construction
+  (`vllm/v1/engine/core.py:136`) and nothing reads it earlier.
+- `llm_sim/harness/scheduler.py` — `SimScheduler(Scheduler)`: the real
+  `schedule()`, observed not modified; captures each step's `SchedulerOutput`
+  for the cost model and metrics. The loop nulls the capture before every
+  `core.step()` so a stale capture trips an assert instead of being silently
+  reused.
+- `llm_sim/engine.py` — SimLoop rewritten to drive `core.step()`: admits
+  arrivals gated by the virtual clock, charges the cost model per step,
+  records metrics. Zero-token steps (the trailing cleanup step after the last
+  finish, or a wedged workload) are never recorded. Prefill/decode
+  classification recovers the pre-step computed count as
+  `num_computed_tokens - n_sched` — valid because `update_from_output` leaves
+  `num_computed_tokens` alone outside the spec-decode/KV-connector paths
+  (verified against the pinned 0.23.0; comment at the classification site).
+- `llm_sim/cli.py` — boots EngineCore. `--num-blocks` is now optional (unset →
+  derive from the budget; the default 1 GiB gives 910 blocks for opt-125m
+  fp32 at block 16); `--kv-cache-bytes` added. KV-capacity `ValueError`s are
+  translated into advice naming `--num-blocks` / `--kv-cache-bytes` /
+  `--max-model-len`, gated on the two verbatim raise-site messages of
+  `_check_enough_kv_cache_memory` (`vllm/v1/core/kv_cache_utils.py:720` and
+  `:740`) — note the `:720` message ("No available memory for the cache
+  blocks") does not contain the substring "KV cache", so a naive gate would
+  miss it. Any other `ValueError` surfaces vLLM's message without the KV
+  advice.
+- Retired (per the spike's replace rule): `llm_sim/harness/builder.py`,
+  `llm_sim/sampler.py`, `tests/test_builder.py`, `tests/test_sampler.py`
+  (11 tests) — the scheduler-in-isolation harness is gone.
+
+### Deviations from the sketch above
+
+1. **Virtual time is charged loop-side, not inside `_model_forward`.** The
+   plan was to charge cost at the `_model_forward` seam; the shipped loop
+   charges it after `core.step()` returns, from the captured
+   `SchedulerOutput`. Equivalent for the current model: in-process with
+   `log_stats=False`, nothing in EngineCore reads wall time to make a
+   scheduling decision (FCFS orders on `Request.arrival_time`, which our
+   factory sets explicitly), so the clock is pure loop-side bookkeeping.
+   Reopen if a future cost model needs runner-internal signals (e.g.
+   per-microbatch timing) — that would move cost charging back inside the
+   seam.
+2. **`CostModel.step_latency()`'s second argument is now the
+   post-`update_from_output` scheduler state** (the MVP passed pre-update
+   state). `ConstantCostModel` is unaffected; the contract is documented in
+   the `llm_sim/cost/base.py` docstring. Matters only for future stateful
+   cost models.
+3. **Tiny-blocks/huge-`max_model_len` configs are unrepresentable.** vLLM
+   0.23.0 validates KV capacity against the *overridden* block count
+   (`kv_cache_utils.py:2021-2052` scales available memory to
+   `override × bytes_per_block` before calling
+   `_check_enough_kv_cache_memory`), so the MVP preemption scenario
+   (`num_blocks=8` / `max_model_len=4096`) cannot boot. Re-derived as
+   `num_blocks=12` / `max_model_len=128` / 4 requests of 16 prompt + 48
+   output tokens — observed 2 preemptions, all 4 requests finish,
+   `peak_blocks_used` 10 (re-run 2026-07-17).
+4. **`max_model_len` passes through as `None`** instead of defaulting to
+   `max_num_batched_tokens`: opt-125m's ModelConfig validation caps
+   `max_model_len` at 2048 (`max_position_embeddings`), so a 8192 default
+   would be rejected; `None` lets vLLM derive the model's own limit.
+5. **`blocks_used` counts vLLM's always-allocated null block** (`BlockPool`
+   pops it from the free queue at init, `vllm/v1/core/block_pool.py:176`): an
+   idle engine reports `blocks_used == 1`, and tests assert exact peaks that
+   include it (e.g. 11 = 5 requests × 2 blocks + null).
+6. **KV blocks are really allocated as CPU tensors** (~1.125 MiB/block for
+   opt-125m fp32 at block 16). The MVP-era default of 10 000 blocks would
+   cost ~11 GiB of host RAM — hence `--num-blocks` became optional with the
+   budget-derived default.
+
+### Fidelity evidence
+
+`./simulate.sh demo --viz` reproduces the MVP's exact headline numbers through
+the full real stack: 71 steps, peak batch 229 tokens, peak running 15, peak KV
+99/500 blocks (re-run 2026-07-17). The ported MVP scenarios — lockstep step
+counts, staggered-arrival fast-forward (`num_steps == 4`, virtual time
+≥ 100 s), forced preemption — pass with their assertions unweakened
+(`tests/test_engine.py`). Two sequential EngineCore lifecycles in one process
+work
+(`tests/test_harness_enginecore.py::test_second_lifecycle_in_same_process`);
+the spike had only ever built one.
+
+### Suite state
+
+90 tests, all passing, ~44 s wall (the spike-era suite was 95; the 11 MVP
+harness tests retired, EngineCore harness / loop / CLI coverage added).
+
+Still open: the plugin activation guard (tracked in `docs/backlog.md`), and —
+scoped out at open, unchanged by this landing — prefix-cache /
+sampled-token-identity fidelity and spec-decode (see "Honest limitations"
+above).

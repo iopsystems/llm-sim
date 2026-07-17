@@ -65,19 +65,20 @@ args to the CLI (run it from anywhere):
 ### KV-cache sizing
 
 `--num-blocks` is optional: by default the block count derives from a 1 GiB
-analytic KV budget (`--kv-cache-bytes`), which comes out to ~910 blocks for
-opt-125m fp32 at `--block-size 16`. Unlike the MVP, KV blocks are **really
-allocated** as CPU tensors (~1.1 MiB/block for opt-125m fp32 at block 16) —
-small budgets are cheap, huge ones cost real host RAM.
+**analytic KV budget** (`--kv-cache-bytes`) — analytic in that the per-block
+cost is computed from the model's shape, replacing vLLM's GPU memory
+profiling — which comes out to ~910 blocks for opt-125m fp32 at
+`--block-size 16`. Unlike the MVP, KV blocks are **really allocated** as CPU
+tensors (~1.1 MiB/block for opt-125m fp32 at block 16) — small budgets are
+cheap, huge ones cost real host RAM.
 
-The budget must hold one maximum-length request: vLLM's
-`check_enough_kv_cache_memory` requires `num_blocks × block_size ≥
-max_model_len` (derived 2048 for opt-125m), and it validates against
-`--num-blocks` when you override the count. Tight-budget experiments
-therefore need a lowered `--max-model-len` (see the preempt example below).
-When a config doesn't fit, the CLI translates vLLM's rejection into an
-actionable error naming `--num-blocks` / `--kv-cache-bytes` /
-`--max-model-len`.
+The config must hold one maximum-length request — `num_blocks × block_size ≥
+max_model_len` (derived 2048 for opt-125m) — even when `--num-blocks`
+overrides the count (mechanism under Key facts below). Tight-budget
+experiments therefore need a lowered `--max-model-len` (see the preempt
+example below). When a config doesn't fit, the CLI translates vLLM's
+rejection into an actionable error naming `--num-blocks` /
+`--kv-cache-bytes` / `--max-model-len`.
 
 ### Visualization
 
@@ -212,8 +213,9 @@ internals is needed for the constant-latency cost model.
   `SimScheduler` (real `schedule()`, observed not modified).
 - **`num_gpu_blocks_override` doesn't bypass the capacity check.** The
   override sets the exact block count, but `check_enough_kv_cache_memory`
-  still validates against it: `num_blocks × block_size` must cover
-  `max_model_len` or engine construction raises.
+  (`vllm/v1/core/kv_cache_utils.py`) still validates against it:
+  `num_blocks × block_size` must cover `max_model_len` or engine
+  construction raises.
 - **Token timing:** the first output token samples in the same step the
   prompt finishes computing, so a request with `output_len=N` finishes `N-1`
   steps after its prompt completes.
