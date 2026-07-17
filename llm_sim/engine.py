@@ -108,6 +108,10 @@ class SimLoop:
             self.clock.advance(dt)
 
             block_pool = scheduler.kv_cache_manager.block_pool
+            # blocks_used counts vLLM's always-allocated null block: BlockPool
+            # pops it from the free queue at init (block_pool.py:176), so an
+            # idle engine reports blocks_used == 1, and only num_gpu_blocks - 1
+            # blocks are usable for requests.
             blocks_used = block_pool.num_gpu_blocks - block_pool.get_num_free_blocks()
             finished = sum(
                 1 for r in requests_by_id.values() if RequestStatus.is_finished(r.status)

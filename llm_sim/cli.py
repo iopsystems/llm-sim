@@ -85,16 +85,26 @@ def main(argv: Optional[List[str]] = None) -> dict:
     args = _build_parser().parse_args(argv)
 
     specs = list(_build_workload(args).generate())
-    core = build_engine_core(
-        model=args.model,
-        block_size=args.block_size,
-        num_blocks=args.num_blocks,
-        kv_cache_bytes=args.kv_cache_bytes,
-        max_num_seqs=args.max_num_seqs,
-        max_num_batched_tokens=args.max_num_batched_tokens,
-        max_model_len=args.max_model_len,
-        enable_chunked_prefill=not args.no_chunked_prefill,
-    )
+    try:
+        core = build_engine_core(
+            model=args.model,
+            block_size=args.block_size,
+            num_blocks=args.num_blocks,
+            kv_cache_bytes=args.kv_cache_bytes,
+            max_num_seqs=args.max_num_seqs,
+            max_num_batched_tokens=args.max_num_batched_tokens,
+            max_model_len=args.max_model_len,
+            enable_chunked_prefill=not args.no_chunked_prefill,
+        )
+    except ValueError as e:
+        # vLLM's advice names knobs this CLI doesn't expose
+        # (gpu_memory_utilization); translate to our own flags but keep the
+        # original message -- it carries the estimated maximum model length.
+        raise SystemExit(
+            "engine rejected the KV cache config: "
+            f"{e}\n(llm_sim knobs: raise --num-blocks or --kv-cache-bytes, "
+            "or lower --max-model-len so one max-length request fits the budget)"
+        ) from e
     try:
         loop = SimLoop(
             core=core,

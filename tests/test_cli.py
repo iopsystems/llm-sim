@@ -91,9 +91,11 @@ def test_trace_run_from_csv(tmp_path):
     assert summary["num_steps"] == 2
 
 
-def test_default_num_blocks_derives_from_kv_budget(tmp_path):
+def test_default_num_blocks_derives_from_kv_budget():
     # No --num-blocks: block count comes from the 1 GiB analytic budget,
     # not host RAM and not the old hardcoded 10000.
+    # Deliberately allocates ~1 GiB of KV cache (910 blocks) -- that IS the
+    # behavior under test, so don't shrink it.
     summary = main(
         [
             "--workload", "synthetic",
@@ -105,3 +107,24 @@ def test_default_num_blocks_derives_from_kv_budget(tmp_path):
     )
     assert summary["total_finished"] == 2
     assert 0 < summary["num_blocks"] < 2000  # ~910 for opt-125m fp32 @ bs16
+
+
+def test_kv_config_rejection_reports_llm_sim_knobs():
+    # --num-blocks 8 cannot hold one request at the derived max_model_len
+    # (2048), so vLLM's check_enough_kv_cache_memory raises. The CLI must
+    # translate that into advice naming its own flags, not vLLM's
+    # gpu_memory_utilization.
+    with pytest.raises(SystemExit) as excinfo:
+        main(
+            [
+                "--workload", "synthetic",
+                "--num-requests", "1",
+                "--num-blocks", "8",
+            ]
+        )
+    msg = str(excinfo.value)
+    assert "--num-blocks" in msg
+    assert "--kv-cache-bytes" in msg
+    assert "--max-model-len" in msg
+    # vLLM's original datum is preserved.
+    assert "estimated maximum model length" in msg
