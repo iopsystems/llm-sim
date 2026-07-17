@@ -18,6 +18,9 @@ rezolus = ["pyarrow>=14", "h2histogram>=0.1"]
 [project.scripts]
 llm-sim = "llm_sim.cli:main"
 
+[project.entry-points."vllm.platform_plugins"]
+llm-sim-mock = "llm_sim.mock:register"
+
 [tool.setuptools.packages.find]
 include = ["llm_sim*"]
 
