@@ -64,3 +64,41 @@ def test_two_concurrent_requests_finish_in_lockstep():
     assert s["total_finished"] == 2
     assert abs(s["virtual_time_s"] - 0.02) < 1e-9
     assert s["num_steps"] == 2
+
+
+def test_all_requests_finish_and_blocks_never_exceed_budget():
+    specs = [RequestSpec(f"r{i}", 0.0, 16, 3) for i in range(5)]
+    metrics = _run(specs, num_blocks=100, latency=0.005)
+    s = metrics.summary()
+    assert s["total_finished"] == 5
+    assert all(r.blocks_used <= r.num_blocks for r in metrics.records)
+
+
+def test_staggered_arrival_fast_forwards_idle_gap():
+    # r1 arrives long after r0 has finished -> loop must jump virtual time.
+    specs = [
+        RequestSpec("r0", 0.0, 16, 2),
+        RequestSpec("r1", 100.0, 16, 2),
+    ]
+    metrics = _run(specs, latency=1.0)
+    s = metrics.summary()
+    assert s["total_finished"] == 2
+    assert s["num_steps"] == 4  # 2 recorded steps each, no overlap
+    assert s["virtual_time_s"] >= 100.0
+
+
+def test_tight_block_budget_forces_preemption():
+    # vLLM's check_enough_kv_cache_memory requires the budget to hold one
+    # max_model_len request, so the MVP's num_blocks=8/max_model_len=4096 combo
+    # is impossible here. Instead: max_model_len=128 (8 blocks), 12 blocks
+    # total (11 usable after the null block), 4 requests growing to
+    # 16+48=64 tokens = 4 blocks each -> peak demand 16 > 11 -> preemption,
+    # and every request still fits individually -> all finish.
+    specs = [RequestSpec(f"r{i}", 0.0, 16, 48) for i in range(4)]
+    metrics = _run(
+        specs, num_blocks=12, latency=0.01, max_num_seqs=64, max_model_len=128
+    )
+    s = metrics.summary()
+    assert s["total_preemptions"] >= 1
+    assert s["total_finished"] == 4
+    assert all(r.blocks_used <= r.num_blocks for r in metrics.records)

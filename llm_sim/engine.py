@@ -15,20 +15,22 @@ arrivals remain.
 
 from typing import Iterable, Optional
 
+from vllm.v1.engine.core import EngineCore
 from vllm.v1.request import RequestStatus
 
 from llm_sim.clock import VirtualClock
 from llm_sim.cost.base import CostModel
 from llm_sim.metrics import MetricsRecorder
 from llm_sim.workload.base import RequestSpec
+from llm_sim.workload.factory import RequestFactory
 
 
 class SimLoop:
     def __init__(
         self,
-        core,
+        core: EngineCore,
         specs: Iterable[RequestSpec],
-        factory,
+        factory: RequestFactory,
         cost_model: CostModel,
         clock: Optional[VirtualClock] = None,
         metrics: Optional[MetricsRecorder] = None,
@@ -68,6 +70,11 @@ class SimLoop:
 
             self.core.step()
             scheduler_output = scheduler.last_scheduler_output
+            # Invariant: the has_requests() guard above matches EngineCore.step()'s
+            # internal short-circuit, so schedule() always ran this iteration. If a
+            # future vLLM bump breaks that pairing, fail loudly here instead of
+            # silently reusing a stale capture.
+            assert scheduler_output is not None
 
             if scheduler_output.total_num_scheduled_tokens == 0:
                 # Nothing scheduled: either the trailing cleanup step after the

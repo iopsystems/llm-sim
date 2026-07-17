@@ -12,5 +12,9 @@ from typing import Any
 class CostModel(ABC):
     @abstractmethod
     def step_latency(self, scheduler_output: Any, state: Any) -> float:
-        """Return the virtual-time cost (seconds) of executing one scheduled step."""
+        """Return the virtual-time cost (seconds) of executing one scheduled step.
+
+        ``state`` is the scheduler AFTER update_from_output (post-step state);
+        ``scheduler_output`` carries the step's batch composition.
+        """
         raise NotImplementedError
