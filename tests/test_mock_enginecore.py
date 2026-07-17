@@ -9,30 +9,15 @@ Needs facebook/opt-125m in the local HF cache (config only; weights are
 dummy-loaded). Skips cleanly when it isn't available.
 """
 
-import os
-
 import pytest
 
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
+from tests.conftest import MODEL, model_cached  # sets HF_HUB_OFFLINE before vllm
 
 from llm_sim.workload.base import RequestSpec
 from llm_sim.workload.factory import RequestFactory
 
-MODEL = "facebook/opt-125m"
-
-
-def _model_cached() -> bool:
-    try:
-        from huggingface_hub import snapshot_download
-
-        snapshot_download(MODEL, local_files_only=True, allow_patterns=["config.json"])
-        return True
-    except Exception:
-        return False
-
-
 pytestmark = pytest.mark.skipif(
-    not _model_cached(), reason=f"{MODEL} not in local HF cache"
+    not model_cached(), reason=f"{MODEL} not in local HF cache"
 )
 
 
@@ -64,7 +49,7 @@ def test_platform_is_mock():
 def test_config_gpu_free(engine_core):
     _, vllm_config = engine_core
     # num_blocks derives from MockWorker's analytic budget, not host memory.
-    from llm_sim.mock.worker import MOCK_KV_CACHE_BYTES
+    from llm_sim.mock.worker import DEFAULT_KV_CACHE_BYTES
 
     assert vllm_config.parallel_config.worker_cls == "llm_sim.mock.worker.MockWorker"
     assert vllm_config.cache_config.num_gpu_blocks is not None
@@ -73,7 +58,7 @@ def test_config_gpu_free(engine_core):
         vllm_config.cache_config.block_size  # tokens/block
     )
     assert per_block > 0
-    assert MOCK_KV_CACHE_BYTES == 1 << 30
+    assert DEFAULT_KV_CACHE_BYTES == 1 << 30
 
     # Scheduling semantics the sim relies on.
     assert vllm_config.scheduler_config.async_scheduling is False

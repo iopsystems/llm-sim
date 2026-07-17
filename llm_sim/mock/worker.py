@@ -28,9 +28,16 @@ from vllm.v1.worker.worker_base import CompilationTimes
 
 import llm_sim.mock.ops  # noqa: F401  -- registers _C CPU op fallbacks
 
-# Sim-owned KV budget. TODO(v2): make this a sim config knob; num_blocks
-# derives from it and drives preemption behavior.
-MOCK_KV_CACHE_BYTES = 1 << 30
+# Sim-owned analytic KV budget (bytes). num_blocks derives from it and drives
+# preemption; the sim sets it per run via set_kv_cache_bytes().
+DEFAULT_KV_CACHE_BYTES = 1 << 30
+_kv_cache_bytes = DEFAULT_KV_CACHE_BYTES
+
+
+def set_kv_cache_bytes(n: int | None) -> None:
+    """Set the KV budget for subsequently built engines (None = default 1 GiB)."""
+    global _kv_cache_bytes
+    _kv_cache_bytes = DEFAULT_KV_CACHE_BYTES if n is None else int(n)
 
 
 class MockModelRunner(CPUModelRunner):
@@ -83,7 +90,7 @@ class MockWorker(Worker):
         self.model_runner = MockModelRunner(self.vllm_config, self.device)
 
     def determine_available_memory(self) -> int:
-        return MOCK_KV_CACHE_BYTES
+        return _kv_cache_bytes
 
     def compile_or_warm_up_model(self) -> CompilationTimes:
         set_random_seed(self.model_config.seed)
