@@ -19,8 +19,8 @@ the engineering-journal skill).
 
 ## Done
 
-- **v2 implementation: EngineCore becomes the engine.** Done — landed on
-  `main` via `feat/v2-enginecore-engine`: the real `EngineCore.step()` loop
+- **v2 implementation: EngineCore becomes the engine.** Done — implemented on
+  `feat/v2-enginecore-engine`: the real `EngineCore.step()` loop
   replaced the MVP SimLoop, the KV budget became a sim knob
   (`--kv-cache-bytes` / `--num-blocks`), the virtual clock / cost model is
   wired loop-side, and the MVP harness (`llm_sim/harness/builder.py`,

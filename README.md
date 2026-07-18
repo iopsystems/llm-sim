@@ -43,8 +43,10 @@ engine dummy-loads them (`load_format="dummy"`).
 > `_model_forward`, pure-torch `_C` op fallbacks) plus `llm_sim/harness/`
 > (EngineCore builder + `SimScheduler` capture). The plugin is registered
 > under the `vllm.platform_plugins` entry point in `pyproject.toml`, so it
-> activates `MockPlatform` for **every** vLLM use in this venv. Re-verify the
-> injection surface (inventoried in
+> activates `MockPlatform` for **every** vLLM use in this venv. Also
+> pin-coupled: the verbatim KV-capacity error signatures in `llm_sim/cli.py`
+> (`_KV_CAPACITY_SIGNATURES`; test-enforced, degrades to a generic message on
+> drift). Re-verify the injection surface (inventoried in
 > `docs/journal/2026-07-09-gpu-mock-enginecore-boot.md`) before bumping the pin.
 
 ## Usage
@@ -232,7 +234,7 @@ internals is needed for the constant-latency cost model.
 
 Pure-Python modules (clock, cost, workload, metrics, viz, export) need no
 vLLM; the EngineCore-backed tests boot the real engine, which dummy-loads
-opt-125m (~5–15 s per boot) and needs its `config.json` in the local HF cache
+opt-125m (a few seconds per boot) and needs its `config.json` in the local HF cache
 — they skip cleanly when it's absent (the suite runs with `HF_HUB_OFFLINE=1`).
 The marquee test (`tests/test_engine.py`) runs real `EngineCore.step()` under
 the loop and asserts batch composition, step counts, deterministic peak
