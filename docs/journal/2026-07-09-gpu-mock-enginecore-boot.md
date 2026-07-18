@@ -1,8 +1,8 @@
 # v2: GPU-mock — boot the real vLLM stack in-process (EngineCore)
 
-**Status:** CLOSED — **shipped** (2026-07-17). Spike returned **GO** (see
-"Spike verdict" below); the EngineCore-backed engine replaced the MVP SimLoop
-on branch `feat/v2-enginecore-engine` (see "Implementation" below).
+**Status:** CLOSED — **shipped** (2026-07-17, PR #4). Spike returned **GO**
+(see "Spike verdict" below); the EngineCore-backed engine replaced the MVP
+SimLoop on branch `feat/v2-enginecore-engine` (see "Implementation" below).
 
 **Opened:** 2026-07-09.
 
@@ -174,7 +174,8 @@ behind the `_model_forward` + `determine_available_memory` seams.
 ## Implementation (shipped 2026-07-17)
 
 Implemented on `feat/v2-enginecore-engine` (commits `03b17cf`..`d42b3e6` off
-`6dd96f3`). The spike's replace decision executed as decided; what shipped:
+`6dd96f3`, PR #4). The spike's replace decision executed as decided; what
+shipped:
 
 - `llm_sim/harness/enginecore.py` — `build_engine_core()`: boots a live
   EngineCore (`load_format="dummy"`, `enforce_eager=True`, `dtype="float32"`,
