@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from llm_sim.cost.constant import ConstantCostModel
 from llm_sim.engine import SimLoop
-from llm_sim.harness.builder import build_scheduler
+from llm_sim.harness.enginecore import build_engine_core
 from llm_sim.workload.factory import RequestFactory
 from llm_sim.workload.synthetic import SyntheticWorkload
 from llm_sim.workload.trace import TraceWorkload
@@ -35,9 +35,15 @@ def _build_parser() -> argparse.ArgumentParser:
     # Trace workload
     p.add_argument("--trace", type=str, default=None, help="path to CSV/JSONL trace")
 
-    # Scheduler config
+    # Engine config
     p.add_argument("--model", type=str, default="facebook/opt-125m")
-    p.add_argument("--num-blocks", type=int, default=10000)
+    p.add_argument("--num-blocks", type=int, default=None,
+                   help="exact KV block count (allocates real host RAM, "
+                        "~1.1 MiB/block for opt-125m fp32); "
+                        "default: derive from --kv-cache-bytes")
+    p.add_argument("--kv-cache-bytes", type=int, default=None,
+                   help="analytic KV budget in bytes (default 1 GiB); "
+                        "num_blocks derives from it when --num-blocks is unset")
     p.add_argument("--block-size", type=int, default=16)
     p.add_argument("--max-num-seqs", type=int, default=16)
     p.add_argument("--max-num-batched-tokens", type=int, default=8192)
@@ -75,27 +81,57 @@ def _build_workload(args):
     )
 
 
+# The two messages check_enough_kv_cache_memory can raise
+# (vllm/v1/core/kv_cache_utils.py:720 and :740 in the pinned vllm==0.23.0).
+# Only these get translated into KV-knob advice; note the first one does NOT
+# contain the words "KV cache".
+_KV_CAPACITY_SIGNATURES = (
+    "No available memory for the cache blocks",
+    "KV cache is needed, which is larger than the available KV cache",
+)
+
+
 def main(argv: Optional[List[str]] = None) -> dict:
     args = _build_parser().parse_args(argv)
 
     specs = list(_build_workload(args).generate())
-    scheduler = build_scheduler(
-        model=args.model,
-        num_blocks=args.num_blocks,
-        block_size=args.block_size,
-        max_num_seqs=args.max_num_seqs,
-        max_num_batched_tokens=args.max_num_batched_tokens,
-        max_model_len=args.max_model_len,
-        enable_chunked_prefill=not args.no_chunked_prefill,
-    )
-    factory = RequestFactory(block_size=args.block_size)
-    loop = SimLoop(
-        scheduler=scheduler,
-        specs=specs,
-        factory=factory,
-        cost_model=ConstantCostModel(latency_s=args.latency),
-    )
-    metrics = loop.run()
+    try:
+        core = build_engine_core(
+            model=args.model,
+            block_size=args.block_size,
+            num_blocks=args.num_blocks,
+            kv_cache_bytes=args.kv_cache_bytes,
+            max_num_seqs=args.max_num_seqs,
+            max_num_batched_tokens=args.max_num_batched_tokens,
+            max_model_len=args.max_model_len,
+            enable_chunked_prefill=not args.no_chunked_prefill,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if any(sig in msg for sig in _KV_CAPACITY_SIGNATURES):
+            # vLLM's advice names knobs this CLI doesn't expose
+            # (gpu_memory_utilization); translate to our own flags but keep
+            # the original message -- it carries the estimated maximum model
+            # length.
+            raise SystemExit(
+                "engine rejected the KV cache config: "
+                f"{msg}\n(llm_sim knobs: raise --num-blocks or --kv-cache-bytes, "
+                "or lower --max-model-len so one max-length request fits the budget)"
+            ) from e
+        # Any other ValueError (e.g. pydantic ValidationError from model
+        # config validation) is not a KV capacity problem; surface vLLM's
+        # message as-is, without the KV-knob advice.
+        raise SystemExit(f"engine rejected the configuration: {msg}") from e
+    try:
+        loop = SimLoop(
+            core=core,
+            specs=specs,
+            factory=RequestFactory(block_size=args.block_size),
+            cost_model=ConstantCostModel(latency_s=args.latency),
+        )
+        metrics = loop.run()
+    finally:
+        core.shutdown()
     summary = metrics.summary()
     summary["num_requests"] = len(specs)
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 #
-# simulate.sh — convenience wrapper for the vLLM scheduler-in-isolation simulator.
+# simulate.sh — convenience wrapper for the vLLM EngineCore simulator.
 #
 # Ensures the project virtualenv exists (creating + installing on first run),
 # then forwards all arguments to the `llm_sim` CLI. Run it from anywhere.
+#
+# NOTE: --num-blocks allocates real host RAM now (~1.1 MiB/block for opt-125m
+# fp32); leave it unset to derive the block count from the 1 GiB KV budget.
 #
 #   ./simulate.sh --workload synthetic --num-requests 30 --arrival-rate 50 \
 #       --prompt-len 32 128 --output-len 8 32 --num-blocks 500 --jsonl steps.jsonl
@@ -62,8 +65,8 @@ case "${1:-}" in
     shift
     exec "$PY" -m llm_sim --workload synthetic \
       --num-requests 4 --interval 0.0 \
-      --prompt-len 16 16 --output-len 16 16 \
-      --num-blocks 8 --max-num-seqs 64 --max-model-len 4096 --latency 0.01 "$@"
+      --prompt-len 16 16 --output-len 48 48 \
+      --num-blocks 12 --max-num-seqs 64 --max-model-len 128 --latency 0.01 "$@"
     ;;
   *)
     exec "$PY" -m llm_sim "$@"
