@@ -8,8 +8,9 @@ the engineering-journal skill).
 
 - **Effort B — engine abstraction** (`EngineAdapter` interface,
   shared-core-plus-extras StepRecord schema, `--engine {vllm,sglang}` CLI).
-  **Blocked on** the SGLang spike's verdict — the interface is deliberately
-  not designed until the second implementation's shape is known.
+  **Unblocked**: the SGLang spike returned GO (full-engine) with a 3-unit
+  injection surface and a named synthetic-forward seam
+  (`TpModelWorker.forward_batch_generation`). Opens as its own journal entry.
   Source: [`docs/journal/2026-07-24-sglang-engine-spike.md`](journal/2026-07-24-sglang-engine-spike.md).
 - **Cross-engine comparison tooling** (side-by-side runs, diff reports).
   A possible third effort once two engines actually run; explicitly not part

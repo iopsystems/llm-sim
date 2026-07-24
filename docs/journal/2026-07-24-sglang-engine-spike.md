@@ -1,6 +1,8 @@
 # SGLang engine: mockability spike (Effort A of engine generality)
 
-**Status:** OPEN — intent landed, spike pending.
+**Status:** CLOSED — spike returned **GO (full-engine)** (2026-07-24, see
+"Spike verdict" below). Effort B (engine abstraction) is unblocked and opens
+as its own entry.
 
 **Opened:** 2026-07-24.
 
@@ -89,6 +91,90 @@ injection surface?
   release that decouples the scheduler from its process harness").
 
 Either verdict closes this entry honestly; B's scope is set by the verdict.
+
+## Spike verdict — GO (full-engine) (2026-07-24)
+
+All four probes passed on the first or second attempt, Linux x86_64, no GPU
+(`torch.cuda.is_available() == False`). **Pin: `sglang==0.5.15.post1`**
+(bare `pip install sglang`; the base wheel now includes the full srt runtime —
+122 pinned deps, an 11 GB venv including driverless CUDA wheel payloads;
+`torch==2.11.0+cu130`, same pin as the vllm venv, though the venvs stay
+separate). The gate landed as `tests/test_sglang_scheduler.py` — skips
+cleanly in the repo's main venv (no sglang), gates under `.venv-sglang`.
+
+**Probe 0 — imports clean; this entry's risk #1 was FALSE.** SGLang 0.5.15
+has a platform seam: the `sglang.srt.platforms` entry-point group resolves
+`current_platform` lazily (built-ins include `CpuSRTPlatform`;
+`SGLANG_USE_CPU_ENGINE=1` or `SGLANG_PLATFORM` select it) — the vLLM-style
+plugin architecture the entry assumed absent. `sgl_kernel` genuinely cannot
+import without CUDA, but it is not on the scheduler path: tree-wide only 12
+files import it unguarded at module level, all runtime-selected backends
+(e.g. `srt/layers/attention/flashattention_backend.py:39`).
+
+**Probe 1 — Scheduler constructs in-process, GPU-free, ~1.9 s.** Real
+`ServerArgs(model_path="facebook/opt-125m", device="cpu",
+load_format="dummy")` + `PortArgs.init_new` + direct `Scheduler(...)`: zero
+child processes, one benign watchdog daemon thread. The constructor's ZMQ
+sockets (`init_ipc_channels`, scheduler.py:615) bind peer-less `ipc://`
+endpoints and never block; `torch.distributed` initializes in-process (gloo,
+world_size=1); attention backend auto-falls-back to `TorchNativeAttnBackend`
+(no Intel AMX on this host); NUMA/affinity binding lives outside `__init__`
+(`configure_scheduler_process`, scheduler.py:4270, env-gated) and is bypassed
+entirely. Real `RadixCache`, `ReqToTokenPool`, `MHATokenToKVPool` on CPU fp16
+tensors (k_buffer shape (4097, 12, 64) for opt-125m).
+
+**Probe 2 — real step loop end-to-end, and the real forward RUNS.** Mirroring
+`event_loop_normal` (scheduler.py:1542) minus ZMQ recv:
+`handle_generate_request` (scheduler.py:2043) →
+`get_next_batch_to_run` (scheduler.py:2607) → `run_batch` (scheduler.py:3200)
+→ `process_batch_result` (scheduler.py:3461). Two requests: prefill → decode
+→ both `FINISH_LENGTH` at exactly `max_new_tokens`; batch shrinks 2→1 after
+the first finish; on finish, tokens move to radix-**evictable** rather than
+freeing (proper retention semantics). Unlike v2 (where CPU kernels were
+absent from the CUDA wheel), the **real transformer forward executes** via
+`TorchNativeAttnBackend` on dummy fp16 weights: prefill (28 tok, bs=2)
+~80 ms, decode ~16–21 ms/step, `process_batch_result` &lt;1 ms. ZMQ egress
+(output streaming toward the absent detokenizer) is a silent in-memory
+buffered send — no error, no block.
+
+**Probe 3 — deterministic.** Fresh processes, same seed → bit-identical
+per-step traces (batch composition, occupancy, finish steps, output ids),
+verified for both greedy and temperature-1.0 sampling.
+
+**Injection surface: 3 units** (GO criterion allowed ≤ ~6), all sanctioned
+APIs — zero monkeypatches, zero source edits, zero stubs:
+
+1. CPU device signal — `ServerArgs(device="cpu")` or `SGLANG_USE_CPU_ENGINE=1`
+   (either alone suffices; without one, `get_device()` raises at
+   `srt/utils/common.py:899`).
+2. `load_format="dummy"` — real `OPTForCausalLM` with random weights, no
+   weight files (config/tokenizer from HF cache, `HF_HUB_OFFLINE=1`).
+3. `SamplingParams.normalize(None)` before injection — we inject past
+   TokenizerManager, which normally normalizes params
+   (tokenizer_manager.py:1133); skipping it crashes
+   `_check_str_based_finish` (schedule_batch.py:1360).
+
+**Synthetic-forward seam for Effort B (named, not built):**
+`TpModelWorker.forward_batch_generation` (tp_worker.py:489), reached via the
+plain `self.model_worker` attribute (set in `init_model_worker`,
+scheduler.py:877) — a duck-typed wrapper drops in with no plumbing;
+fabricate `GenerationBatchResult` (managers/utils.py:39). Inner alternative:
+`ModelRunner.forward` (model_runner.py:3001). Since the real forward works,
+the seam is for cost control and speed at scale, not for unblocking.
+
+**Honest limitations (carried into Effort B):**
+
+- Greedy over dummy weights samples token id 0 every step — token identities
+  are degenerate, so radix/prefix-cache *hit* fidelity remains deferred
+  (same limitation as v2; acute for SGLang, whose scheduler is radix-centric).
+- The real CPU forward at ~20 ms/decode-step is fine for tests, too slow for
+  large sims — Effort B should charge virtual time at the
+  `forward_batch_generation` seam (or accept wall cost for small runs).
+- Peer-less ZMQ sends buffer in memory indefinitely; long sims should read
+  results from `req.output_ids` directly and avoid unbounded egress queues.
+- The pin is heavy (11 GB venv) and SGLang's release cadence is fast;
+  re-verify the three injection units and the four loop call sites before
+  any pin bump.
 
 ## Deferred (mirrored in `docs/backlog.md`)
 
