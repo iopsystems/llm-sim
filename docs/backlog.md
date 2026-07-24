@@ -6,6 +6,20 @@ the engineering-journal skill).
 
 ## Open
 
+- **Effort B — engine abstraction** (`EngineAdapter` interface,
+  shared-core-plus-extras StepRecord schema, `--engine {vllm,sglang}` CLI).
+  **Blocked on** the SGLang spike's verdict — the interface is deliberately
+  not designed until the second implementation's shape is known.
+  Source: [`docs/journal/2026-07-24-sglang-engine-spike.md`](journal/2026-07-24-sglang-engine-spike.md).
+- **Cross-engine comparison tooling** (side-by-side runs, diff reports).
+  A possible third effort once two engines actually run; explicitly not part
+  of Effort B.
+  Source: [`docs/journal/2026-07-24-sglang-engine-spike.md`](journal/2026-07-24-sglang-engine-spike.md).
+- **Prefix-cache fidelity under realistic token identities.** Constant
+  dummy-token prompts defeat prefix caching in both engines; radix-cache
+  studies need realistic prompts. Noted as a v2 limitation; becomes acute if
+  SGLang (radix-centric scheduler) lands.
+  Source: [`docs/journal/2026-07-24-sglang-engine-spike.md`](journal/2026-07-24-sglang-engine-spike.md).
 - **Activation guard for the mock platform plugin.** `llm_sim.mock:register`
   activates unconditionally for every vLLM use in the venv; add an env-var
   gate **if** the environment ever needs to run real vLLM alongside the sim.
