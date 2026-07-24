@@ -1,8 +1,8 @@
 # SGLang engine: mockability spike (Effort A of engine generality)
 
-**Status:** CLOSED — spike returned **GO (full-engine)** (2026-07-24, see
-"Spike verdict" below). Effort B (engine abstraction) is unblocked and opens
-as its own entry.
+**Status:** CLOSED — spike returned **GO (full-engine)** (2026-07-24, PR #5,
+see "Spike verdict" below). Effort B (engine abstraction) is unblocked and
+opens as its own entry.
 
 **Opened:** 2026-07-24.
 
